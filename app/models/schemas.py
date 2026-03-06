@@ -132,4 +132,5 @@ class AlertaResponse(BaseModel):
     nivel: str = Field(..., description="Nivel de severidad")
     descripcion: str = Field(..., description="Descripción del desvío")
     creado_en: datetime = Field(..., description="Fecha y hora del análisis")
+    visto: bool = Field(False, description="Indica si la alerta ya fue leída por el usuario")
 

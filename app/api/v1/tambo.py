@@ -82,19 +82,26 @@ async def analyze_production(
 @router.get("/alertas/{idEstablecimiento}", response_model=List[AlertaResponse])
 async def get_alertas(
     idEstablecimiento: str,
+    rango: int = None,
     db: AsyncSession = Depends(get_db),
 ):
     """
     Return all alerts for a given establishment, ordered by most recent first.
+    Optionally filter by the last `rango` days.
 
     Each alert corresponds to a single lot with a detected merma deviation.
     Returns empty list if no alerts exist.
     """
-    stmt = (
-        select(Alerta)
-        .where(Alerta.id_establecimiento == idEstablecimiento)
-        .order_by(Alerta.creado_en.desc())
-    )
+    from datetime import datetime, timedelta
+
+    stmt = select(Alerta).where(Alerta.id_establecimiento == idEstablecimiento)
+
+    if rango is not None:
+        fecha_limite = datetime.utcnow() - timedelta(days=rango)
+        stmt = stmt.where(Alerta.creado_en >= fecha_limite)
+
+    stmt = stmt.order_by(Alerta.creado_en.desc())
+    
     result = await db.execute(stmt)
     alertas = result.scalars().all()
 
@@ -108,6 +115,7 @@ async def get_alertas(
             nivel=a.nivel,
             descripcion=a.descripcion,
             creado_en=a.creado_en,
+            visto=a.visto,
         )
         for a in alertas
     ]
@@ -128,10 +136,8 @@ async def get_ultimas_alertas(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Return the last 2 alerts for a given establishment.
-
-    Useful for dashboards and quick summaries.
-    Returns empty list if no alerts exist.
+    Return only the last 2 most recent alerts for an establishment.
+    Useful for dashboard summaries.
     """
     stmt = (
         select(Alerta)
@@ -152,6 +158,7 @@ async def get_ultimas_alertas(
             nivel=a.nivel,
             descripcion=a.descripcion,
             creado_en=a.creado_en,
+            visto=a.visto,
         )
         for a in alertas
     ]
@@ -160,3 +167,39 @@ async def get_ultimas_alertas(
         f"Retrieved last {len(response)} alertas for establishment {idEstablecimiento}"
     )
     return response
+
+
+# ---------------------------------------------------------------------------
+# HU - PUT /api/v1/tambo/alertas/{idAlerta}/visto
+# ---------------------------------------------------------------------------
+
+@router.put("/alertas/{idAlerta}/visto", response_model=AlertaResponse)
+async def marcar_alerta_visto(
+    idAlerta: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Mark a specific alert as read (visto = True).
+    """
+    stmt = select(Alerta).where(Alerta.id == idAlerta)
+    result = await db.execute(stmt)
+    alerta = result.scalars().first()
+    
+    if not alerta:
+        raise HTTPException(status_code=404, detail="Alerta no encontrada")
+        
+    alerta.visto = True
+    await db.commit()
+    await db.refresh(alerta)
+    
+    return AlertaResponse(
+        id=alerta.id,
+        idEstablecimiento=alerta.id_establecimiento,
+        idLote=alerta.id_lote,
+        producto=alerta.producto,
+        categoria=alerta.categoria,
+        nivel=alerta.nivel,
+        descripcion=alerta.descripcion,
+        creado_en=alerta.creado_en,
+        visto=alerta.visto,
+    )

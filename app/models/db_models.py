@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Text, DateTime, Index
+from sqlalchemy import Column, String, Text, DateTime, Index, Boolean
 from app.database import Base
 
 
@@ -19,6 +19,7 @@ class Alerta(Base):
     nivel = Column(String, nullable=False)                # "bajo" | "medio" | "alto"
     descripcion = Column(Text, nullable=False)             # desvío de merma explicado por la IA
     creado_en = Column(DateTime, default=datetime.utcnow, nullable=False)
+    visto = Column(Boolean, default=False, nullable=False) # Para marcar como leído en frontend
 
     __table_args__ = (
         Index("ix_alertas_establecimiento_fecha", "id_establecimiento", "creado_en"),
