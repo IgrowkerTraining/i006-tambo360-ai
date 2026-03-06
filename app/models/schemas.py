@@ -134,3 +134,7 @@ class AlertaResponse(BaseModel):
     creado_en: datetime = Field(..., description="Fecha y hora del análisis")
     visto: bool = Field(False, description="Indica si la alerta ya fue leída por el usuario")
 
+
+class AlertasNoVistasResponse(BaseModel):
+    """Result for counting unread alerts."""
+    cantidad: int = Field(..., description="Cantidad de alertas no leídas (visto = False)")

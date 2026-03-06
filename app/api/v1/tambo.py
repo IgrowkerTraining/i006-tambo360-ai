@@ -10,6 +10,7 @@ from app.models.schemas import (
     TamboAnalysisInput,
     TamboAnalysisOutput,
     AlertaResponse,
+    AlertasNoVistasResponse,
 )
 from app.models.db_models import Alerta
 from app.database import get_db
@@ -203,3 +204,28 @@ async def marcar_alerta_visto(
         creado_en=alerta.creado_en,
         visto=alerta.visto,
     )
+
+
+# ---------------------------------------------------------------------------
+# NUEVO — GET /api/v1/tambo/alertas/{idEstablecimiento}/no-vistas
+# ---------------------------------------------------------------------------
+
+@router.get("/alertas/{idEstablecimiento}/no-vistas", response_model=AlertasNoVistasResponse)
+async def get_alertas_no_vistas_count(
+    idEstablecimiento: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Return the total count of unread alerts (visto = False) for an establishment.
+    """
+    from sqlalchemy import func
+    
+    stmt = (
+        select(func.count(Alerta.id))
+        .where(Alerta.id_establecimiento == idEstablecimiento)
+        .where(Alerta.visto == False)
+    )
+    result = await db.execute(stmt)
+    count = result.scalar_one_or_none() or 0
+    
+    return AlertasNoVistasResponse(cantidad=count)
