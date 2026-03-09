@@ -138,8 +138,7 @@ def build_prompt(outliers: list[dict], data: TamboAnalysisInput) -> list[ChatMes
     user_message = ChatMessage(
         role="user",
         content=(
-            f"Establecimiento: '{data.nombreEstablecimiento}' (ID: {data.idEstablecimiento}), "
-            f"período: {data.periodo}.\n\n"
+            f"Establecimiento: '{data.nombreEstablecimiento}' (ID: {data.idEstablecimiento}).\n\n"
             f"Lotes con desvío de merma detectado:\n{outliers_text}\n\n"
             "Generá la descripción técnica para cada uno."
         ),
@@ -213,7 +212,7 @@ async def analyze(data: TamboAnalysisInput) -> TamboAnalysisOutput:
     """Full pipeline: Python computes → AI describes → return structured output."""
     logger.info(
         f"Starting analysis for establishment {data.idEstablecimiento}, "
-        f"period {data.periodo}, {len(data.lotes)} lotes"
+        f"{len(data.lotes)} lotes"
     )
 
     # Step 1: Python identifies outliers (no AI needed for math)
@@ -234,7 +233,6 @@ async def analyze(data: TamboAnalysisInput) -> TamboAnalysisOutput:
     logger.info(f"Analysis complete: {len(alertas)} alertas detected")
     return TamboAnalysisOutput(
         idEstablecimiento=data.idEstablecimiento,
-        periodo=data.periodo,
         alertas_detectadas=alertas,
     )
 

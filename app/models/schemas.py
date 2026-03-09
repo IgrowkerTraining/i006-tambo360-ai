@@ -95,7 +95,6 @@ class TamboAnalysisInput(BaseModel):
     """Input payload sent by the main backend to trigger an AI analysis."""
     idEstablecimiento: str = Field(..., description="ID del establecimiento")
     nombreEstablecimiento: str = Field(..., description="Nombre del establecimiento")
-    periodo: str = Field(..., description="Período analizado, ej: 'Enero 2025'")
     lotes: List[LoteInput] = Field(..., min_length=15, description="Lotes de producción a analizar (mínimo 15)")
 
 
@@ -115,7 +114,6 @@ class AlertaLote(BaseModel):
 class TamboAnalysisOutput(BaseModel):
     """Structured output returned by TamboEngine after AI analysis."""
     idEstablecimiento: str = Field(..., description="ID del establecimiento analizado")
-    periodo: str = Field(..., description="Período analizado")
     alertas_detectadas: List[AlertaLote] = Field(
         default=[],
         description="Una alerta por cada lote problemático. Vacía si no hay desvíos."
