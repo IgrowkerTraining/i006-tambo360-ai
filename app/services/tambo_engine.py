@@ -120,6 +120,9 @@ def build_prompt(outliers: list[dict], data: TamboAnalysisInput) -> list[ChatMes
         indent=2,
     )
 
+    primer_lote = data.lotes[0].numeroLote
+    ultimo_lote = data.lotes[-1].numeroLote
+
     system_message = ChatMessage(
         role="system",
         content=(
@@ -130,7 +133,8 @@ def build_prompt(outliers: list[dict], data: TamboAnalysisInput) -> list[ChatMes
             "1. Responde ÚNICAMENTE con un JSON válido: una lista de objetos con 'idLote' y 'descripcion'.\n"
             "2. Sin texto adicional, sin markdown, sin explicaciones fuera del JSON.\n"
             "3. La descripción debe mencionar la merma real, el promedio de la categoría y el porcentaje de desvío.\n"
-            "4. Máximo 2 oraciones por descripción. Tono técnico.\n\n"
+            "4. Máximo 2 oraciones por descripción. Tono técnico.\n"
+            f"5. La descripción debe comenzar SIEMPRE con la frase exacta: 'En base al análisis desde el lote {primer_lote} hasta el {ultimo_lote}, '\n\n"
             f"Formato exacto:\n{schema_example}"
         ),
     )
@@ -167,7 +171,7 @@ async def call_model(messages: list[ChatMessage]) -> str:
 # ---- Response validation -------------------------------------------------
 
 
-def merge_descriptions(raw: str, outliers: list[dict]) -> list[AlertaLote]:
+def merge_descriptions(raw: str, outliers: list[dict], data: TamboAnalysisInput) -> list[AlertaLote]:
     """
     Parse AI descriptions and merge with pre-computed outlier data.
     If AI fails, fall back to generating the description from the numbers.
@@ -186,10 +190,14 @@ def merge_descriptions(raw: str, outliers: list[dict]) -> list[AlertaLote]:
     except Exception as e:
         logger.warning(f"Could not parse AI descriptions, using fallback: {e}")
 
+    primer_lote = data.lotes[0].numeroLote
+    ultimo_lote = data.lotes[-1].numeroLote
+
     alertas = []
     for o in outliers:
         desc = descriptions.get(o["idLote"]) or (
-            f"Merma de {o['merma_total']} {o['unidad']} supera en "
+            f"En base al análisis desde el lote {primer_lote} hasta el {ultimo_lote}, "
+            f"la merma de {o['merma_total']} {o['unidad']} supera en "
             f"{o['porcentaje_sobre_promedio']}% el promedio de la categoría "
             f"{o['categoria']} ({o['promedio_categoria']} {o['unidad']})."
         )
@@ -226,7 +234,7 @@ async def analyze(data: TamboAnalysisInput) -> TamboAnalysisOutput:
         raw_response = await call_model(messages)
 
         # Step 3: Merge AI descriptions with pre-computed data
-        alertas = merge_descriptions(raw_response, outliers)
+        alertas = merge_descriptions(raw_response, outliers, data)
     else:
         logger.info("No outliers detected, skipping AI call")
 

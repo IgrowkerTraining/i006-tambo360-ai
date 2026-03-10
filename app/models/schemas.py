@@ -82,6 +82,7 @@ class CostoDirectoInput(BaseModel):
 class LoteInput(BaseModel):
     """Represents a production lot from the main backend."""
     idLote: str = Field(..., description="ID del lote (UUID del backend principal)")
+    numeroLote: int = Field(..., description="Número correlativo del lote")
     fechaProduccion: str = Field(..., description="Fecha de producción (ISO 8601)")
     producto: str = Field(..., description="Nombre del producto")
     categoria: str = Field(..., description="Categoría: 'quesos' o 'leches'")
