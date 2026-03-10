@@ -74,6 +74,7 @@ def compute_outliers(data: TamboAnalysisInput) -> list[dict]:
 
         outliers.append({
             "idLote": lote.idLote,
+            "numeroLote": lote.numeroLote,
             "producto": lote.producto,
             "categoria": lote.categoria,
             "unidad": lote.unidad,
@@ -101,7 +102,7 @@ def build_prompt(outliers: list[dict], data: TamboAnalysisInput) -> list[ChatMes
         return []  # No call needed
 
     outliers_text = "\n".join([
-        f"- idLote: {o['idLote']} | Producto: {o['producto']} | Categoría: {o['categoria']}"
+        f"- numeroLote: {o['numeroLote']} | Producto: {o['producto']} | Categoría: {o['categoria']}"
         f" | Merma: {o['merma_total']} {o['unidad']}"
         f" | Promedio de su categoría: {o['promedio_categoria']} {o['unidad']}"
         f" | Supera el promedio en: {o['porcentaje_sobre_promedio']}%"
@@ -130,11 +131,11 @@ def build_prompt(outliers: list[dict], data: TamboAnalysisInput) -> list[ChatMes
             "Los cálculos ya están hechos. Tu única tarea es redactar una descripción "
             "técnica y objetiva del desvío de merma para cada lote que se te indica.\n\n"
             "REGLAS:\n"
-            "1. Responde ÚNICAMENTE con un JSON válido: una lista de objetos con 'idLote' y 'descripcion'.\n"
+            "1. Responde ÚNICAMENTE con un JSON válido: una lista de objetos con 'idLote' y 'descripcion'. Nota: usa el 'numeroLote' recibido como idLote en tu JSON de respuesta.\n"
             "2. Sin texto adicional, sin markdown, sin explicaciones fuera del JSON.\n"
-            "3. La descripción debe mencionar la merma real, el promedio de la categoría y el porcentaje de desvío.\n"
+            "3. La descripción debe mencionar la merma real, el promedio de la categoría y el porcentaje de desvío. Referencia al lote específico anteponiendo una 'L' mayúscula al número (ej: 'el lote L8').\n"
             "4. Máximo 2 oraciones por descripción. Tono técnico.\n"
-            f"5. La descripción debe comenzar SIEMPRE con la frase exacta: 'En base al análisis desde el lote {primer_lote} hasta el {ultimo_lote}, '\n\n"
+            f"5. La descripción debe comenzar SIEMPRE con la frase exacta: 'En base al análisis desde el lote L{primer_lote} hasta el L{ultimo_lote}, '\n\n"
             f"Formato exacto:\n{schema_example}"
         ),
     )
@@ -195,9 +196,9 @@ def merge_descriptions(raw: str, outliers: list[dict], data: TamboAnalysisInput)
 
     alertas = []
     for o in outliers:
-        desc = descriptions.get(o["idLote"]) or (
-            f"En base al análisis desde el lote {primer_lote} hasta el {ultimo_lote}, "
-            f"la merma de {o['merma_total']} {o['unidad']} supera en "
+        desc = descriptions.get(str(o["numeroLote"])) or (
+            f"En base al análisis desde el lote L{primer_lote} hasta el L{ultimo_lote}, "
+            f"el lote L{o['numeroLote']} presenta una merma de {o['merma_total']} {o['unidad']} superando en "
             f"{o['porcentaje_sobre_promedio']}% el promedio de la categoría "
             f"{o['categoria']} ({o['promedio_categoria']} {o['unidad']})."
         )
