@@ -32,13 +32,13 @@ async def analyze_production(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Analyze all lots of an establishment and generate one alert per problematic lot.
+    Analiza todos los lotes de un establecimiento y genera una alerta por cada lote problemático.
 
-    - Requires at least 15 lots (validated by schema)
-    - Groups lots by category (quesos / leches)
-    - Detects lots whose merma exceeds 20% above the category average
-    - Saves one Alerta record per problematic lot
-    - Returns the full analysis result
+    - Requiere al menos 15 lotes (validado por el esquema)
+    - Agrupa los lotes por categoría (quesos / leches)
+    - Detecta lotes cuya merma supera en un 20% el promedio de la categoría
+    - Guarda un registro de Alerta por cada lote problemático
+    - Retorna el resultado completo del análisis
     """
     try:
         result = await tambo_engine.analyze(data)
@@ -87,11 +87,11 @@ async def get_alertas(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Return all alerts for a given establishment, ordered by most recent first.
-    Optionally filter by the last `rango` days.
+    Retorna todas las alertas para un establecimiento dado, ordenadas por la más reciente primero.
+    Opcionalmente filtra por los últimos `rango` días.
 
-    Each alert corresponds to a single lot with a detected merma deviation.
-    Returns empty list if no alerts exist.
+    Cada alerta corresponde a un único lote con un desvío de merma detectado.
+    Retorna una lista vacía si no existen alertas.
     """
     from datetime import datetime, timedelta
 
@@ -137,8 +137,8 @@ async def get_ultimas_alertas(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Return only the last 2 most recent alerts for an establishment.
-    Useful for dashboard summaries.
+    Retorna solo las últimas 2 alertas más recientes para un establecimiento.
+    Útil para resúmenes de tablero (dashboard).
     """
     stmt = (
         select(Alerta)
@@ -180,7 +180,7 @@ async def marcar_alerta_visto(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Mark a specific alert as read (visto = True).
+    Marca una alerta específica como leída (visto = True).
     """
     stmt = select(Alerta).where(Alerta.id == idAlerta)
     result = await db.execute(stmt)
@@ -216,7 +216,7 @@ async def get_alertas_no_vistas_count(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Return the total count of unread alerts (visto = False) for an establishment.
+    Retorna el conteo total de alertas no leídas (visto = False) para un establecimiento.
     """
     from sqlalchemy import func
     
@@ -229,3 +229,40 @@ async def get_alertas_no_vistas_count(
     count = result.scalar_one_or_none() or 0
     
     return AlertasNoVistasResponse(cantidad=count)
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/tambo/alertas/{idEstablecimiento}/lote/{idLote}
+# ---------------------------------------------------------------------------
+
+@router.get("/alertas/{idEstablecimiento}/lote/{idLote}", response_model=List[AlertaResponse])
+async def get_alertas_por_lote(
+    idEstablecimiento: str,
+    idLote: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retorna todas las alertas asociadas con un lote de producción específico para un establecimiento.
+    """
+    stmt = (
+        select(Alerta)
+        .where(Alerta.id_establecimiento == idEstablecimiento)
+        .where(Alerta.id_lote == idLote)
+    )
+    result = await db.execute(stmt)
+    alertas = result.scalars().all()
+    
+    return [
+        AlertaResponse(
+            id=a.id,
+            idEstablecimiento=a.id_establecimiento,
+            idLote=a.id_lote,
+            producto=a.producto,
+            categoria=a.categoria,
+            nivel=a.nivel,
+            descripcion=a.descripcion,
+            creado_en=a.creado_en,
+            visto=a.visto,
+        )
+        for a in alertas
+    ]
