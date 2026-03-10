@@ -133,7 +133,7 @@ def build_prompt(outliers: list[dict], data: TamboAnalysisInput) -> list[ChatMes
             "REGLAS:\n"
             "1. Responde ÚNICAMENTE con un JSON válido: una lista de objetos con 'idLote' y 'descripcion'. Nota: usa el 'numeroLote' recibido como idLote en tu JSON de respuesta.\n"
             "2. Sin texto adicional, sin markdown, sin explicaciones fuera del JSON.\n"
-            "3. La descripción debe mencionar la merma real, el promedio de la categoría y el porcentaje de desvío. Referencia al lote específico anteponiendo una 'L' mayúscula al número (ej: 'el lote L8').\n"
+            "3. La descripción debe mencionar la merma real, el promedio de la categoría, el porcentaje de desvío y EL NOMBRE de la categoría (ej: 'la categoría quesos'). Referencia al lote específico anteponiendo una 'L' mayúscula al número (ej: 'el lote L8').\n"
             "4. Máximo 2 oraciones por descripción. Tono técnico.\n"
             f"5. La descripción debe comenzar SIEMPRE con la frase exacta: 'En base al análisis desde el lote L{primer_lote} hasta el L{ultimo_lote}, '\n\n"
             f"Formato exacto:\n{schema_example}"
