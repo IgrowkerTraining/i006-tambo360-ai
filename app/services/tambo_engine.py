@@ -31,34 +31,45 @@ def compute_outliers(data: TamboAnalysisInput) -> list[dict]:
     A lot is an outlier if its total merma exceeds the category average by >20%.
     Returns a list of dicts with all data needed to build the prompt and output.
     """
-    # Group merma totals by category
-    category_mermas: dict[str, list[float]] = defaultdict(list)
-    lot_merma_totals: dict[str, float] = {}
+    # Group merma totals by category and calculate sum of production
+    category_totals = defaultdict(lambda: {"merma": 0.0, "produccion": 0.0})
+    lot_merma_pcts = {}
+    lot_merma_totals = {}
 
     for lote in data.lotes:
-        total = sum(m.cantidad for m in lote.mermas)
-        lot_merma_totals[lote.idLote] = total
-        category_mermas[lote.categoria].append(total)
+        merma_total = sum(m.cantidad for m in lote.mermas)
+        lot_merma_totals[lote.idLote] = merma_total
+        
+        # Avoid division by zero
+        if lote.cantidad > 0:
+            pct = (merma_total / lote.cantidad) * 100
+        else:
+            pct = 0.0
+            
+        lot_merma_pcts[lote.idLote] = pct
+        
+        category_totals[lote.categoria]["merma"] += merma_total
+        category_totals[lote.categoria]["produccion"] += lote.cantidad
 
-    # Calculate average per category
-    category_avg: dict[str, float] = {
-        cat: sum(vals) / len(vals)
-        for cat, vals in category_mermas.items()
-        if vals
+    # Average merma percentage per category (Weighted)
+    category_avg_pct: dict[str, float] = {
+        cat: (totals["merma"] / totals["produccion"]) * 100 if totals["produccion"] > 0 else 0.0
+        for cat, totals in category_totals.items()
     }
 
-    logger.info(f"Category averages: { {c: round(v, 2) for c, v in category_avg.items()} }")
+    logger.info(f"Category average merma %: { {c: round(v, 2) for c, v in category_avg_pct.items()} }")
 
-    # Identify outliers: any lot whose merma exceeds its category average
+    # Identify outliers: any lot whose merma % exceeds its category average merma %
     outliers = []
     for lote in data.lotes:
         total = lot_merma_totals[lote.idLote]
-        avg = category_avg.get(lote.categoria, 0)
+        pct = lot_merma_pcts[lote.idLote]
+        avg_pct = category_avg_pct.get(lote.categoria, 0)
 
-        if avg == 0:
+        if avg_pct == 0:
             continue
 
-        pct_over = (total - avg) / avg * 100
+        pct_over = (pct - avg_pct) / avg_pct * 100
 
         # Solo alertar si supera el promedio
         if pct_over <= 0:
@@ -79,7 +90,8 @@ def compute_outliers(data: TamboAnalysisInput) -> list[dict]:
             "categoria": lote.categoria,
             "unidad": lote.unidad,
             "merma_total": round(total, 2),
-            "promedio_categoria": round(avg, 2),
+            "pct_merma_lote": round(pct, 2),
+            "promedio_categoria_pct": round(avg_pct, 2),
             "porcentaje_sobre_promedio": round(pct_over, 1),
             "nivel": nivel,
         })
@@ -103,9 +115,10 @@ def build_prompt(outliers: list[dict], data: TamboAnalysisInput) -> list[ChatMes
 
     outliers_text = "\n".join([
         f"- numeroLote: {o['numeroLote']} | Producto: {o['producto']} | Categoría: {o['categoria']}"
-        f" | Merma: {o['merma_total']} {o['unidad']}"
-        f" | Promedio de su categoría: {o['promedio_categoria']} {o['unidad']}"
-        f" | Supera el promedio en: {o['porcentaje_sobre_promedio']}%"
+        f" | Merma absoluta: {o['merma_total']} {o['unidad']}"
+        f" | Porcentaje de merma de este lote: {o['pct_merma_lote']}%"
+        f" | Porcentaje de merma del promedio de su categoría: {o['promedio_categoria_pct']}%"
+        f" | El porcentaje de este lote supera el promedio en un: {o['porcentaje_sobre_promedio']}%"
         f" | Nivel: {o['nivel']}"
         for o in outliers
     ])
@@ -133,7 +146,7 @@ def build_prompt(outliers: list[dict], data: TamboAnalysisInput) -> list[ChatMes
             "REGLAS:\n"
             "1. Responde ÚNICAMENTE con un JSON válido: una lista de objetos con 'idLote' y 'descripcion'. Nota: usa el 'numeroLote' recibido como idLote en tu JSON de respuesta.\n"
             "2. Sin texto adicional, sin markdown, sin explicaciones fuera del JSON.\n"
-            "3. La descripción debe mencionar la merma real, el promedio de la categoría, el porcentaje de desvío y EL NOMBRE de la categoría (ej: 'la categoría quesos'). Referencia al lote específico anteponiendo una 'L' mayúscula al número (ej: 'el lote L8').\n"
+            "3. La descripción debe mencionar la merma absoluta, el % de merma del lote, el % de merma promedio de la categoría, el porcentaje de desvío y EL NOMBRE de la categoría (ej: 'la categoría quesos'). Referencia al lote específico anteponiendo una 'L' mayúscula al número (ej: 'el lote L8').\n"
             "4. Máximo 2 oraciones por descripción. Tono técnico.\n"
             f"5. La descripción debe comenzar SIEMPRE con la frase exacta: 'En base al análisis desde el lote L{primer_lote} hasta el L{ultimo_lote}, '\n\n"
             f"Formato exacto:\n{schema_example}"
@@ -198,9 +211,9 @@ def merge_descriptions(raw: str, outliers: list[dict], data: TamboAnalysisInput)
     for o in outliers:
         desc = descriptions.get(str(o["numeroLote"])) or (
             f"En base al análisis desde el lote L{primer_lote} hasta el L{ultimo_lote}, "
-            f"el lote L{o['numeroLote']} presenta una merma de {o['merma_total']} {o['unidad']} superando en "
-            f"{o['porcentaje_sobre_promedio']}% el promedio de la categoría "
-            f"{o['categoria']} ({o['promedio_categoria']} {o['unidad']})."
+            f"el lote L{o['numeroLote']} presenta una merma de {o['merma_total']} {o['unidad']} (que es el {o['pct_merma_lote']}% de su volumen total), "
+            f"superando en un {o['porcentaje_sobre_promedio']}% el porcentaje promedio de la categoría "
+            f"{o['categoria']} (que es tan solo {o['promedio_categoria_pct']}%)."
         )
         alertas.append(
             AlertaLote(
