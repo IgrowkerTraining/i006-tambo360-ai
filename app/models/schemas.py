@@ -96,7 +96,8 @@ class TamboAnalysisInput(BaseModel):
     """Input payload sent by the main backend to trigger an AI analysis."""
     idEstablecimiento: str = Field(..., description="ID del establecimiento")
     nombreEstablecimiento: str = Field(..., description="Nombre del establecimiento")
-    lotes: List[LoteInput] = Field(..., min_length=15, description="Lotes de producción a analizar (mínimo 15)")
+    periodo: Optional[str] = Field(default=None, description="Periodo (opcional, para compatibilidad hacia atrás)")
+    lotes: List[LoteInput] = Field(..., min_length=1, description="Lotes de producción a analizar (puede ser individual o en grupo)")
 
 
 # ---------------------------------------------------------------------------

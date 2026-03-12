@@ -41,7 +41,7 @@ async def analyze_production(
     - Retorna el resultado completo del análisis
     """
     try:
-        result = await tambo_engine.analyze(data)
+        result = await tambo_engine.analyze(data, db)
 
         # Save one DB record per detected alert
         for alerta_lote in result.alertas_detectadas:
